@@ -6,8 +6,11 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/core/core.hpp>
+#include <cmath>
 
 #include "ocl.hpp"
+#include "iters.hpp"
+
 
 
 using namespace std;
@@ -103,14 +106,48 @@ void raytrace(cv::Mat img) {
 int main() {
 //    Ocl cl;
 //    cl.run();
-    cv::Mat image;
-    image.create(300, 400, CV_8UC1);
-    raytrace(image);
 
-    cv::namedWindow("Image", cv::WINDOW_AUTOSIZE);
-    cv::imshow("Image", image);
+//    cv::Mat image;
+//    image.create(300, 400, CV_8UC1);
+//    raytrace(image);
+//
+//    cv::namedWindow("Image", cv::WINDOW_AUTOSIZE);
+//    cv::imshow("Image", image);
+//
+//    cv::waitKey(0);
 
-    cv::waitKey(0);
+    int *a = new int[10]();
+    for (size_t i=0; i<10; i++) {
+        a[i] = i;
+    }
+    int *b = new int[10]();
+    for (size_t i=0; i<10; i++) {
+        b[i] = i+20;
+    }
+
+    auto l = make_shared<ListBase<int>>(3);
+    l->Append(5);
+    l->Append(7);
+    l->Append(11);
+    l->Append(13);
+
+    shared_ptr<Iterator<int>> ar = make_shared<ArrayIterator<int>>(a, 10);
+    shared_ptr<Iterator<int>> br = make_shared<ListIterator<int>>(l);
+
+    auto it = make_shared< AggregatedIterator<int> >();
+    it->AppendIterator(ar);
+//    it->AppendIterator(br);
+    it->First();
+
+    while (!it->Finished()) {
+        cout << it->GetCurrentItem() << endl;
+        it->Next();
+    }
+    cout << "###\n";
+
+//    for (ar->First(); !ar->Finished(); ar->Next()) {
+//        cout << ar->GetCurrentItem() << endl;
+//    }
     cout << "Finish" << endl;
     return 0;
 }
