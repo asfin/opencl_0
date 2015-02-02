@@ -4,9 +4,9 @@ find_package(OpenCV REQUIRED)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
-set(SOURCE_FILES src/main.cpp src/ocl.cpp)
+set(SOURCE_FILES src/main.cpp src/ocl.cpp src/ocl.hpp)
 
 include_directories(/usr/lib64/OpenCL/global/include/)
-#link_directories(/usr/lib64/OpenCL/vendors/intel/)
+link_directories(/usr/lib64/OpenCL/vendors/intel/)
 add_executable(opencl_0 ${SOURCE_FILES})
 target_link_libraries(opencl_0 OpenCL ${OpenCV_LIBS})

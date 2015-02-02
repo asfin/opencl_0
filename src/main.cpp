@@ -16,8 +16,18 @@ using namespace std;
 
 
 int main() {
-    OclRuntime cl;
-    OclTask clTask("ocl_src");
+    try {
+        OclRuntime cl;
+        shared_ptr<OclTask> task = cl.CreateTask("ocl_src");
+        task->TransferBuffers();
+        task->Run();
+        task->GetResult();
+    } catch (cl::Error e) {
+        std::cerr << e.err() << std::endl;
+        std::cerr << e.what() << std::endl;
+    }
+
+//    OclTask clTask("ocl_src", (std::shared_ptr()), (std::basic_string<char, char_traits < _CharT>, allocator < _CharT >> ()));
 //    cl.run();
 
 //    cv::Mat image;

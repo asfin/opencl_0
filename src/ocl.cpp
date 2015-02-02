@@ -23,25 +23,33 @@ OclRuntime::OclRuntime() {
     std::cout << "Devices count: " << devicesList.size() << std::endl;
     currentDevice = devicesList[0];
 
-    context = cl::Context(devicesList);
+    sptr_context = std::make_shared<cl::Context>(devicesList);
+}
 
-////    cl::KernelFunctor simple_add(cl::Kernel(p, "simple_add"), queue, cl::NullRange, cl::NDRange(buflen), cl::NullRange);
+std::shared_ptr<OclTask> OclRuntime::CreateTask(std::string name) {
+    std::shared_ptr<OclTask> task = std::make_shared<OclTask>(sptr_context, currentDevice, name);
+    return task;
 }
 
 void OclTask::push_buffers() {
     size_t elem_sz = sizeof(int);
-    int *h_buf = new int[buflen]();
 
-    cl::Buffer *_buf;
-    _buf = new cl::Buffer(context, CL_MEM_READ_WRITE, elem_sz*buflen);
-    in_buffers.push_back(_buf);
-    _buf = new cl::Buffer(context, CL_MEM_READ_WRITE, elem_sz*buflen);
-    in_buffers.push_back(_buf);
-    _buf = new cl::Buffer(context, CL_MEM_READ_WRITE, elem_sz*buflen);
-    out_buffers.push_back(_buf);
+    if (auto context = wptr_context.lock()) {
 
-    for (auto buf: in_buffers) {
-        queue.enqueueWriteBuffer(*buf, CL_TRUE, 0, elem_sz*buflen, h_buf);
+        int *h_buf = new int[buflen]();
+        cl::Buffer *_buf;
+        _buf = new cl::Buffer(*context, CL_MEM_READ_WRITE, elem_sz*buflen);
+        in_buffers.push_back(_buf);
+        _buf = new cl::Buffer(*context, CL_MEM_READ_WRITE, elem_sz*buflen);
+        in_buffers.push_back(_buf);
+        _buf = new cl::Buffer(*context, CL_MEM_READ_WRITE, elem_sz*buflen);
+        out_buffers.push_back(_buf);
+
+        for (auto buf: in_buffers) {
+            queue->enqueueWriteBuffer(*buf, CL_TRUE, 0, elem_sz*buflen, h_buf);
+        }
+    } else {
+        std::cerr << "Cannot lock wptr_context\n";
     }
 }
 
@@ -49,9 +57,9 @@ void OclTask::pop_buffers() {
     size_t elem_sz = sizeof(int);
     int *out = new int[buflen]();
 
-    cl::Buffer buf = *out_buffers[0];
+    cl::Buffer *buf = out_buffers[0];
 
-    queue.enqueueReadBuffer(buf, CL_TRUE, 0, elem_sz*buflen, out);
+    queue->enqueueReadBuffer(*buf, CL_TRUE, 0, elem_sz*buflen, out);
 
     for (auto i = 0; i < buflen; i++) {
         std::cout << out[i] << ' ';
@@ -59,26 +67,8 @@ void OclTask::pop_buffers() {
     std::cout << std::endl;
 }
 
-void OclRuntime::run() {
-//    push_buffers();
-//    int i = 0;
-//    for (int j = 0; j < in_buffers.size(); j++, i++) {
-//        kernel.setArg(j, in_buffers[j]);
-//    }
-//    for (int j = 0; j < out_buffers.size(); j++) {
-//        auto buf = out_buffers[j];
-//        kernel.setArg(i+j, *buf);
-//    }
-//    queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(buflen), cl::NullRange);
-//    pop_buffers();
-}
-
-OclRuntime::~OclRuntime() {
-}
-
-void OclTask::AppendSources(std::string name) {
-    auto filename = name + ".cl";
-
+void OclTask::LoadSource(std::string name) {
+    auto filename = "ocl_src/" + name + ".cl";
     std::ifstream ocl_src_f(filename);
     std::stringstream buf;
     buf << ocl_src_f.rdbuf();
@@ -91,14 +81,52 @@ void OclTask::CompileSource(std::string name, std::string source) {
 
     cl::Program::Sources cl_src;
     cl_src.push_back({source.c_str(), source.length()});
-    cl::Program program(context, cl_src);
-    if (program.build(devicesList) != CL_SUCCESS) {
-        std::cerr << program.getBuildInfo< CL_PROGRAM_BUILD_LOG>(currentDevice) << std::endl;
+    if (auto context = wptr_context.lock()) {
+        program = new cl::Program(*context, cl_src);
+        cl::vector<cl::Device> dev;
+        dev.push_back(device);
+        if (program->build(dev) != CL_SUCCESS) {
+            std::cerr << program->getBuildInfo< CL_PROGRAM_BUILD_LOG>(device) << std::endl;
+        }
+        kernel = new cl::Kernel(*program, name.c_str());
+    } else {
+        std::cerr << "Cannot lock wptr_context\n";
     }
-    _sources[name] = &program;
-    std::cout << name.c_str() << std::endl;
 }
 
-OclTask::OclTask(std::string src_name) {
-    queue = cl::CommandQueue(context, currentDevice);
+OclTask::OclTask(std::shared_ptr<cl::Context> sptr_context, cl::Device device, std::string name) {
+    this->name = name;
+    this->device = device;
+    wptr_context = sptr_context;
+    LoadSource(name);
+    queue = new cl::CommandQueue(*sptr_context, device);
+}
+
+void OclTask::Run() {
+    TransferBuffers();
+    int i = 0;
+    for (int j = 0; j < in_buffers.size(); j++, i++) {
+        auto buf = in_buffers[j];
+        kernel->setArg(j, *buf);
+    }
+    for (int j = 0; j < out_buffers.size(); j++) {
+        auto buf = out_buffers[j];
+        kernel->setArg(i+j, *buf);
+    }
+    queue->enqueueNDRangeKernel(*kernel, cl::NullRange, cl::NDRange(buflen), cl::NullRange);
+//    queue->finish();
+}
+
+void OclTask::TransferBuffers() {
+    if (already_transferred) {
+        return;
+    }
+    push_buffers();
+    already_transferred = true;
+
+}
+
+void OclTask::GetResult() {
+    pop_buffers();
+
 }

@@ -8,34 +8,40 @@
 #include <iostream>
 #include <map>
 #include <CL/cl.hpp>
+#include <memory>
+
+class OclTask {
+    std::string name;
+    std::weak_ptr<cl::Context> wptr_context;
+    cl::Device device;
+    cl::CommandQueue *queue;
+    cl::Kernel *kernel;
+    cl::Program *program;
+    cl::vector< cl::Buffer * > in_buffers;
+    cl::vector< cl::Buffer * > out_buffers;
+
+    void push_buffers();
+    void pop_buffers();
+    void CompileSource(std::string name, std::string source);
+    void LoadSource(std::string name);
+    bool already_transferred = false;
+public:
+    OclTask(std::shared_ptr<cl::Context> sptr_context, cl::Device device, std::string name);
+    void TransferBuffers();
+    void Run();
+    void GetResult();
+};
 
 class OclRuntime {
     cl::vector< cl::Platform > platformList;
     cl::vector<cl::Device> devicesList;
     cl::Platform currentPlatform;
     cl::Device currentDevice;
-    cl::Context context;
+//    cl::Context context;
+    std::shared_ptr<cl::Context> sptr_context;
 public:
     OclRuntime();
-    ~OclRuntime();
-    void run(OclTask *task);
-};
-
-class OclTask {
-    cl::CommandQueue queue;
-    cl::Kernel kernel;
-    cl::vector< cl::Buffer * > in_buffers;
-    cl::vector< cl::Buffer * > out_buffers;
-
-    std::map<std::string, cl::Program*> _sources;
-    std::map<std::string, cl::Kernel*> _kernels;
-
-    void push_buffers();
-    void pop_buffers();
-public:
-    OclTask(std::string src_name);
-    void CompileSource(std::string name, std::string source);
-    void AppendSources(std::string name);
+    std::shared_ptr<OclTask> CreateTask(std::string name);
 };
 
 #endif
