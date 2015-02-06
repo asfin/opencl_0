@@ -9,7 +9,7 @@
 #include <cmath>
 
 #include "ocl.hpp"
-#include "factories.hpp"
+#include "decor.hpp"
 
 
 using namespace std;

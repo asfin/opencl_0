@@ -78,7 +78,10 @@ void OclTask::LoadSource(std::string name) {
 }
 
 void OclTask::CompileSource(std::string name, std::string source) {
-
+    if (source.length() < 20) {
+        std::cerr << "Source file too small. Check paths.\n";
+        exit(1);
+    }
     cl::Program::Sources cl_src;
     cl_src.push_back({source.c_str(), source.length()});
     if (auto context = wptr_context.lock()) {
@@ -86,7 +89,7 @@ void OclTask::CompileSource(std::string name, std::string source) {
         cl::vector<cl::Device> dev;
         dev.push_back(device);
         if (program->build(dev) != CL_SUCCESS) {
-            std::cerr << program->getBuildInfo< CL_PROGRAM_BUILD_LOG>(device) << std::endl;
+            std::cerr << "ERROR: \n" << program->getBuildInfo< CL_PROGRAM_BUILD_LOG>(device) << std::endl;
         }
         kernel = new cl::Kernel(*program, name.c_str());
     } else {
